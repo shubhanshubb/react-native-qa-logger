@@ -188,7 +188,7 @@ const App: React.FC = () => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#0A0A0A',
+    backgroundColor: 'white',
     paddingTop: 50,
   },
   scrollContent: {
