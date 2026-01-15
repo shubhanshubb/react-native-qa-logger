@@ -469,10 +469,6 @@ Contributions are welcome! Please feel free to submit issues or pull requests.
 
 MIT
 
-## Credits
-
-Inspired by [Loggycian](https://pub.dev/packages/loggy) for Flutter.
-
 ---
 
 Made with ❤️ by [Shubhanshu](https://shubhanshubb.dev)
