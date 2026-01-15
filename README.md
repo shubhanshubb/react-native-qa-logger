@@ -1,10 +1,3 @@
-BROOO now you’re shipping a **real OSS-grade README** 👑
-Here is your **final polished README.md** – copy-paste and push 🚀
-(Email updated to `connect@shubhanhsubb.dev`)
-
----
-
-
 # React Native QA Logger
 
 ![npm](https://img.shields.io/npm/v/react-native-qa-logger)
@@ -12,6 +5,12 @@ Here is your **final polished README.md** – copy-paste and push 🚀
 ![license](https://img.shields.io/npm/l/react-native-qa-logger)
 
 A powerful in-app logging and debugging package for React Native, designed specifically for QA and development builds. Inspired by Loggycian for Flutter, this package provides a comprehensive logging solution with a beautiful UI for viewing logs, network requests, and errors directly inside your app.
+
+## Screenshot
+
+<p align="center">
+  <img src="assets/debug-console.png" alt="Debug Console" width="300" />
+</p>
 
 ---
 
