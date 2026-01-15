@@ -1,6 +1,6 @@
 {
   "name": "react-native-qa-logger",
-  "version": "1.0.2",
+  "version": "1.0.3",
   "description": "In-app QA logging and debugging package for React Native – Debug console, network logging, error tracking",
   "main": "lib/index.js",
   "types": "lib/index.d.ts",
