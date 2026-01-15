@@ -1,0 +1,9 @@
+example/
+node_modules/
+*.test.ts
+*.test.tsx
+.github/
+.vscode/
+.gitignore
+*.tgz
+.DS_Store

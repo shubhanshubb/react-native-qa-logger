@@ -1,0 +1,6 @@
+source 'https://rubygems.org'
+
+ruby ">= 3.0"
+
+gem 'cocoapods', '~> 1.15'
+gem 'activesupport', '~> 7.1.0'
