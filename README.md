@@ -157,7 +157,7 @@ logger.configure({ maxLogs: 500 });
 **Shubhanshu Barnwal**
 Open-Source Author & React Native Engineer
 🌐 [https://shubhanshubb.dev](https://shubhanshubb.dev)
-📧 [connect@shubhanhsubb.dev](mailto:connect@shubhanhsubb.dev)
+📧 [connect@shubhanshubb.dev](mailto:connect@shubhanshubb.dev)
 
 For feature requests, integrations, paid support, or consulting — feel free to reach out.
 
@@ -182,6 +182,6 @@ MIT
 
 > Made with ❤️ by **Shubhanshu Barnwal**
 > Open-Source Author of `react-native-qa-logger`
-> 🌐 [https://shubhanshubb.dev](https://shubhanshubb.dev) | 📧 [connect@shubhanhsubb.dev](mailto:connect@shubhanhsubb.dev)
+> 🌐 [https://shubhanshubb.dev](https://shubhanshubb.dev) | 📧 [connect@shubhanshubb.dev](mailto:connect@shubhanshubb.dev)
 
 ---
