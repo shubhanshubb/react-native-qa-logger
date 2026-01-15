@@ -1,0 +1,16 @@
+name: Link GitHub Package
+
+on:
+  push:
+    tags:
+      - "v*"
+
+jobs:
+  link:
+    runs-on: ubuntu-latest
+    permissions:
+      packages: write
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - run: echo "linking github package"
