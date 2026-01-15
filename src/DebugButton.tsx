@@ -17,6 +17,8 @@ interface DebugButtonProps {
   position?: { x: number; y: number };
   /** Custom icon - can be an image source (require/uri) or emoji string */
   icon?: ImageSourcePropType | string;
+  /** Enable in production builds. Default: only shows in __DEV__ mode */
+  enabled?: boolean;
 }
 
 const BUTTON_SIZE = 56;
@@ -33,7 +35,9 @@ const COLORS = {
   white: '#FFFFFF',
 };
 
-export const DebugButton: React.FC<DebugButtonProps> = ({ onPress, position, icon }) => {
+export const DebugButton: React.FC<DebugButtonProps> = ({ onPress, position, icon, enabled }) => {
+  // Check if should be enabled (either in DEV mode or explicitly enabled)
+  const isEnabled = enabled ?? __DEV__;
   const { width: screenWidth, height: screenHeight } = Dimensions.get('window');
 
   const initialX = position?.x ?? screenWidth - BUTTON_SIZE - 16;
@@ -50,7 +54,7 @@ export const DebugButton: React.FC<DebugButtonProps> = ({ onPress, position, ico
   const [isOverDismissZone, setIsOverDismissZone] = useState(false);
 
   useEffect(() => {
-    if (!__DEV__) return;
+    if (!isEnabled) return;
 
     const unsubscribe = logger.subscribe(() => {
       setLogCount(logger.getLogCount());
@@ -60,7 +64,7 @@ export const DebugButton: React.FC<DebugButtonProps> = ({ onPress, position, ico
     return () => {
       unsubscribe();
     };
-  }, []);
+  }, [isEnabled]);
 
   const showDismissZone = useCallback(() => {
     setIsDragging(true);
@@ -246,8 +250,8 @@ export const DebugButton: React.FC<DebugButtonProps> = ({ onPress, position, ico
     [pan, onPress, screenWidth, screenHeight, showDismissZone, hideDismissZone, dismissButton, dismissZoneScale, dismissZoneCenter]
   );
 
-  // Only render in DEV mode - AFTER all hooks
-  if (!__DEV__ || !isVisible) {
+  // Only render if enabled - AFTER all hooks
+  if (!isEnabled || !isVisible) {
     return null;
   }
 

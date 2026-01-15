@@ -227,9 +227,11 @@ Floating, draggable debug button.
 **Props:**
 - `onPress` (required): Callback when button is tapped
 - `position` (optional): Initial position `{ x: number, y: number }`
+- `icon` (optional): Custom icon (emoji string or image source)
+- `enabled` (optional): Force enable in production. Default: `__DEV__`
 
 **Features:**
-- Only renders in DEV mode (`__DEV__ === true`)
+- By default only renders in DEV mode. Use `enabled={true}` to show in production
 - Draggable with snap-to-edge behavior
 - Swiggy-style dismiss zone (drag to bottom to dismiss)
 - Shows badge with log count
@@ -249,8 +251,10 @@ Bottom sheet debug console.
 **Props:**
 - `visible` (required): Whether console is visible
 - `onClose` (required): Callback when console is closed
+- `enabled` (optional): Force enable in production. Default: `__DEV__`
 
 **Features:**
+- By default only renders in DEV mode. Use `enabled={true}` to show in production
 - Bottom sheet with smooth animations
 - Tabs: All, Network, Errors
 - Search functionality

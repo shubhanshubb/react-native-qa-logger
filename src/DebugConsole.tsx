@@ -17,6 +17,8 @@ import { LogEntry, LogFilter, LogLevel, isNetworkLog } from './types';
 interface DebugConsoleProps {
   visible: boolean;
   onClose: () => void;
+  /** Enable in production builds. Default: only shows in __DEV__ mode */
+  enabled?: boolean;
 }
 
 const SCREEN_HEIGHT = Dimensions.get('window').height;
@@ -52,7 +54,14 @@ const COLORS = {
   borderLight: '#3A3A3A',    // Medium gray
 };
 
-export const DebugConsole: React.FC<DebugConsoleProps> = ({ visible, onClose }) => {
+export const DebugConsole: React.FC<DebugConsoleProps> = ({ visible, onClose, enabled }) => {
+  // Check if should be enabled (either in DEV mode or explicitly enabled)
+  const isEnabled = enabled ?? __DEV__;
+
+  // Return null early if not enabled
+  if (!isEnabled) {
+    return null;
+  }
   const [activeFilter, setActiveFilter] = useState<LogFilter>('all');
   const [logs, setLogs] = useState<LogEntry[]>([]);
   const [expandedLogIds, setExpandedLogIds] = useState<Set<string>>(new Set());
