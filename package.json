@@ -1,20 +1,17 @@
 {
   "name": "react-native-qa-logger",
-  "version": "1.0.4",
+  "version": "1.0.5",
   "description": "In-app QA logging and debugging package for React Native – Debug console, network logging, error tracking",
   "main": "lib/index.js",
   "types": "lib/index.d.ts",
-
   "publishConfig": {
     "registry": "https://registry.npmjs.org/"
   },
-
   "scripts": {
     "build": "tsc",
     "prepare": "npm run build",
     "prepublishOnly": "npm run build"
   },
-
   "keywords": [
     "react-native",
     "logging",
@@ -27,10 +24,8 @@
     "axios-logger",
     "in-app-debugging"
   ],
-
   "author": "Shubhanshu Barnwal <connect@shubhanshubb.dev>",
   "license": "MIT",
-
   "repository": {
     "type": "git",
     "url": "https://github.com/shubhanshubb/react-native-qa-logger.git"
@@ -39,42 +34,35 @@
   "bugs": {
     "url": "https://github.com/shubhanshubb/react-native-qa-logger/issues"
   },
-
   "funding": {
     "type": "individual",
     "url": "https://shubhanshubb.dev"
   },
-
   "maintainers": [
     {
       "name": "Shubhanshu Barnwal",
       "email": "connect@shubhanshubb.dev"
     }
   ],
-
   "peerDependencies": {
     "react": ">=18.0.0",
     "react-native": ">=0.70.0"
   },
-
   "peerDependenciesMeta": {
     "axios": {
       "optional": true
     }
   },
-
   "devDependencies": {
     "@types/react": "^19.0.0",
     "@types/react-native": "^0.72.8",
     "axios": "^1.7.0",
     "typescript": "^5.0.0"
   },
-
   "files": [
     "lib",
     "README.md"
   ],
-
   "engines": {
     "node": ">=16.0.0"
   }
