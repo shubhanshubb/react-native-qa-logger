@@ -1,0 +1,13 @@
+name: Link npm package
+
+on:
+  push:
+    tags:
+      - "v*"
+
+jobs:
+  link:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: echo "npm package linked to this repository"
