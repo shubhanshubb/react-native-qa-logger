@@ -31,7 +31,7 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/shubhanshubb/react-native-qa-logger.git"
+    "url": "https://github.com/shubhanshubb/react-native-qa-logger.git"
   },
   "homepage": "https://github.com/shubhanshubb/react-native-qa-logger#readme",
   "bugs": {
