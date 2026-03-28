@@ -1,6 +1,7 @@
 export { logger } from './logger';
 export {
   setupNetworkLogger,
+  setupAxiosLogger,
   setupFetchLogger,
   restoreFetchLogger,
   setupXHRLogger,

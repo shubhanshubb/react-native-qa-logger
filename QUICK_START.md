@@ -41,17 +41,28 @@ function App() {
 
 ## Step 3: Setup Network Logging (Optional)
 
-If using Axios:
+For universal network support:
+
+```typescript
+import { setupNetworkLogger } from 'react-native-qa-logger';
+
+setupNetworkLogger({
+  sensitiveHeaders: ['authorization', 'x-api-key'],
+  maxBodyLength: 10000,
+});
+```
+
+If you want to attach directly to an Axios instance too:
 
 ```typescript
 import axios from 'axios';
-import { setupNetworkLogger } from 'react-native-qa-logger';
+import { setupAxiosLogger } from 'react-native-qa-logger';
 
 const apiClient = axios.create({
   baseURL: 'https://api.example.com',
 });
 
-setupNetworkLogger(apiClient);
+setupAxiosLogger(apiClient);
 ```
 
 ## Step 4: Start Logging

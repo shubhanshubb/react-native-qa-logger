@@ -2,6 +2,18 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.0.6] - 2026-03-28
+
+### Changed
+- `setupNetworkLogger()` now enables universal network logging for `fetch` and `XMLHttpRequest` by default
+- Added `setupAxiosLogger()` as the explicit Axios instance helper
+- Kept backward compatibility for existing `setupNetworkLogger(axiosInstance)` usage
+
+### Fixed
+- Removed runtime Axios coupling by switching to type-only Axios imports
+- Improved `fetch` header normalization for more request shapes
+- Restored `XMLHttpRequest.setRequestHeader` correctly when disabling XHR logging
+
 ## [1.0.0] - 2026-01-15
 
 ### Added

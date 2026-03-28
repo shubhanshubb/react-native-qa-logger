@@ -10,6 +10,7 @@ import axios from 'axios';
 import {
   logger,
   setupNetworkLogger,
+  setupAxiosLogger,
   setupErrorHandlers,
   DebugButton,
   DebugConsole,
@@ -21,8 +22,14 @@ const apiClient = axios.create({
   timeout: 10000,
 });
 
-// Setup network logging
-setupNetworkLogger(apiClient, {
+// Setup universal network logging
+setupNetworkLogger({
+  sensitiveHeaders: ['authorization', 'api-key'],
+  maxBodyLength: 5000,
+});
+
+// Optional: also attach directly to this Axios instance
+setupAxiosLogger(apiClient, {
   sensitiveHeaders: ['authorization', 'api-key'],
   maxBodyLength: 5000,
 });

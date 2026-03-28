@@ -11,7 +11,7 @@ react-native-qa-logger/
 ├── src/
 │   ├── types.ts              # TypeScript type definitions
 │   ├── logger.ts             # Core logger with in-memory storage
-│   ├── network.ts            # Axios interceptor for network logging
+│   ├── network.ts            # Universal network logging for fetch, XHR, and Axios
 │   ├── errors.ts             # Global error handlers
 │   ├── DebugButton.tsx       # Floating draggable button component
 │   ├── DebugConsole.tsx      # Bottom sheet debug console UI
@@ -58,10 +58,12 @@ react-native-qa-logger/
 
 ### 2. Network Logging (`network.ts`)
 
-**Purpose**: Automatic capture of Axios requests and responses
+**Purpose**: Automatic capture of network traffic across fetch, XHR, and Axios
 
 **Key Features**:
-- Request and response interceptors
+- Global fetch interception
+- XMLHttpRequest interception
+- Optional Axios instance interception
 - Duration tracking
 - Sensitive header redaction
 - Body truncation for large payloads
@@ -69,7 +71,7 @@ react-native-qa-logger/
 
 **Configuration**:
 ```typescript
-setupNetworkLogger(axiosInstance, {
+setupNetworkLogger({
   sensitiveHeaders: ['authorization', 'api-key'],
   maxBodyLength: 10000,
 });

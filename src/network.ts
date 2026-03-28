@@ -1,4 +1,4 @@
-import { AxiosInstance, AxiosRequestConfig, AxiosResponse, AxiosError } from 'axios';
+import type { AxiosInstance, AxiosRequestConfig, AxiosResponse, AxiosError } from 'axios';
 import { logger } from './logger';
 
 /**
@@ -17,9 +17,26 @@ const DEFAULT_SENSITIVE_HEADERS = [
 /**
  * Configuration for network logger
  */
-interface NetworkLoggerConfig {
+export interface NetworkLoggerConfig {
   sensitiveHeaders?: string[];
   maxBodyLength?: number;
+}
+
+interface AxiosLikeInstance {
+  interceptors: {
+    request: {
+      use: (
+        onFulfilled?: (value: any) => any,
+        onRejected?: (error: any) => any
+      ) => any;
+    };
+    response: {
+      use: (
+        onFulfilled?: (value: any) => any,
+        onRejected?: (error: any) => any
+      ) => any;
+    };
+  };
 }
 
 /**
@@ -50,6 +67,34 @@ function filterSensitiveHeaders(
   return filtered;
 }
 
+function normalizeHeaders(
+  headers?: RequestInit['headers'] | Record<string, any>
+): Record<string, string> {
+  if (!headers) {
+    return {};
+  }
+
+  if (typeof Headers !== 'undefined' && headers instanceof Headers) {
+    const normalized: Record<string, string> = {};
+    headers.forEach((value, key) => {
+      normalized[key] = value;
+    });
+    return normalized;
+  }
+
+  if (Array.isArray(headers)) {
+    return headers.reduce<Record<string, string>>((acc, [key, value]) => {
+      acc[String(key)] = String(value);
+      return acc;
+    }, {});
+  }
+
+  return Object.keys(headers).reduce<Record<string, string>>((acc, key) => {
+    acc[key] = String((headers as Record<string, any>)[key]);
+    return acc;
+  }, {});
+}
+
 /**
  * Truncate body if too large
  */
@@ -75,7 +120,7 @@ function generateRequestId(config: AxiosRequestConfig): string {
 /**
  * Setup network logging for Axios instance
  */
-export function setupNetworkLogger(
+export function setupAxiosLogger(
   axiosInstance: AxiosInstance,
   config: NetworkLoggerConfig = {}
 ): void {
@@ -175,6 +220,42 @@ export function setupNetworkLogger(
   );
 }
 
+function isAxiosLikeInstance(value: unknown): value is AxiosLikeInstance {
+  if (!value || typeof value !== 'object') {
+    return false;
+  }
+
+  const candidate = value as AxiosLikeInstance;
+  return Boolean(
+    typeof candidate.interceptors?.request?.use === 'function' &&
+    typeof candidate.interceptors?.response?.use === 'function'
+  );
+}
+
+/**
+ * Setup network logging across the app.
+ * - `setupNetworkLogger()` or `setupNetworkLogger(config)` enables fetch + XHR logging.
+ * - `setupNetworkLogger(axiosInstance, config)` preserves the older Axios-specific setup.
+ */
+export function setupNetworkLogger(): void;
+export function setupNetworkLogger(config: NetworkLoggerConfig): void;
+export function setupNetworkLogger(
+  axiosInstance: AxiosInstance,
+  config?: NetworkLoggerConfig
+): void;
+export function setupNetworkLogger(
+  arg1?: AxiosInstance | NetworkLoggerConfig,
+  arg2: NetworkLoggerConfig = {}
+): void {
+  if (isAxiosLikeInstance(arg1)) {
+    setupAxiosLogger(arg1 as AxiosInstance, arg2);
+    return;
+  }
+
+  const config = (arg1 as NetworkLoggerConfig | undefined) || {};
+  setupAllNetworkLoggers(config);
+}
+
 // ============================================
 // FETCH INTERCEPTOR - Works with global fetch
 // ============================================
@@ -206,15 +287,24 @@ export function setupFetchLogger(config: NetworkLoggerConfig = {}): void {
   // Replace global fetch
   global.fetch = async (input: RequestInfo | URL, init?: RequestInit): Promise<Response> => {
     const startTime = Date.now();
-    const url = typeof input === 'string' ? input : input instanceof URL ? input.toString() : (input as Request).url;
-    const method = init?.method || 'GET';
+    const request = typeof Request !== 'undefined' && input instanceof Request ? input : null;
+    const url = typeof input === 'string'
+      ? input
+      : input instanceof URL
+        ? input.toString()
+        : request?.url || String(input);
+    const method = init?.method || request?.method || 'GET';
+    const mergedHeaders = init?.headers || request?.headers;
 
     let requestBody: any = null;
-    if (init?.body) {
+    const requestInitBody = init?.body;
+    if (requestInitBody) {
       try {
-        requestBody = typeof init.body === 'string' ? JSON.parse(init.body) : init.body;
+        requestBody = typeof requestInitBody === 'string'
+          ? JSON.parse(requestInitBody)
+          : requestInitBody;
       } catch {
-        requestBody = init.body;
+        requestBody = requestInitBody;
       }
     }
 
@@ -250,7 +340,7 @@ export function setupFetchLogger(config: NetworkLoggerConfig = {}): void {
         method: method.toUpperCase(),
         statusCode: response.status,
         duration,
-        requestHeaders: filterSensitiveHeaders(init?.headers as any, sensitiveHeaders),
+        requestHeaders: filterSensitiveHeaders(normalizeHeaders(mergedHeaders), sensitiveHeaders),
         requestBody: truncateBody(requestBody, config.maxBodyLength),
         responseHeaders: filterSensitiveHeaders(responseHeaders, sensitiveHeaders),
         responseBody: truncateBody(responseBody, config.maxBodyLength),
@@ -266,7 +356,7 @@ export function setupFetchLogger(config: NetworkLoggerConfig = {}): void {
         url,
         method: method.toUpperCase(),
         duration,
-        requestHeaders: filterSensitiveHeaders(init?.headers as any, sensitiveHeaders),
+        requestHeaders: filterSensitiveHeaders(normalizeHeaders(mergedHeaders), sensitiveHeaders),
         requestBody: truncateBody(requestBody, config.maxBodyLength),
         error: error.message || 'Network request failed',
       });
@@ -292,6 +382,7 @@ export function restoreFetchLogger(): void {
 
 let originalXHROpen: typeof XMLHttpRequest.prototype.open | null = null;
 let originalXHRSend: typeof XMLHttpRequest.prototype.send | null = null;
+let originalXHRSetRequestHeader: typeof XMLHttpRequest.prototype.setRequestHeader | null = null;
 
 /**
  * Setup network logging for XMLHttpRequest
@@ -315,6 +406,7 @@ export function setupXHRLogger(config: NetworkLoggerConfig = {}): void {
   // Store original methods
   originalXHROpen = XMLHttpRequest.prototype.open;
   originalXHRSend = XMLHttpRequest.prototype.send;
+  originalXHRSetRequestHeader = XMLHttpRequest.prototype.setRequestHeader;
 
   // Override open
   XMLHttpRequest.prototype.open = function(
@@ -335,12 +427,11 @@ export function setupXHRLogger(config: NetworkLoggerConfig = {}): void {
   };
 
   // Override setRequestHeader to capture headers
-  const originalSetRequestHeader = XMLHttpRequest.prototype.setRequestHeader;
   XMLHttpRequest.prototype.setRequestHeader = function(name: string, value: string): void {
     if ((this as any).__qaLogger) {
       (this as any).__qaLogger.requestHeaders[name] = value;
     }
-    return originalSetRequestHeader.call(this, name, value);
+    return originalXHRSetRequestHeader!.call(this, name, value);
   };
 
   // Override send
@@ -421,6 +512,10 @@ export function restoreXHRLogger(): void {
   if (originalXHRSend) {
     XMLHttpRequest.prototype.send = originalXHRSend;
     originalXHRSend = null;
+  }
+  if (originalXHRSetRequestHeader) {
+    XMLHttpRequest.prototype.setRequestHeader = originalXHRSetRequestHeader;
+    originalXHRSetRequestHeader = null;
   }
 }
 

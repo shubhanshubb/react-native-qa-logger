@@ -28,7 +28,7 @@ One button. One console. All logs. All network calls. All errors.
 
 * In-App Debug Console (Bottom Sheet UI)
 * Floating Draggable Debug Button (snap-to-edge)
-* Axios Network Request & Response Logging
+* Universal Network Logging for `fetch`, `XMLHttpRequest`, and Axios
 * Global JS Error & Promise Rejection Capture
 * Color Coded Logs
 * Expandable Log Items
@@ -56,7 +56,6 @@ yarn add react-native-qa-logger
 ```tsx
 import React, { useState } from 'react';
 import { SafeAreaView } from 'react-native';
-import axios from 'axios';
 import {
   logger,
   setupNetworkLogger,
@@ -65,11 +64,7 @@ import {
   DebugConsole,
 } from 'react-native-qa-logger';
 
-const apiClient = axios.create({
-  baseURL: 'https://api.example.com',
-});
-
-setupNetworkLogger(apiClient);
+setupNetworkLogger();
 setupErrorHandlers();
 
 export default function App() {
@@ -98,10 +93,27 @@ logger.error('Payment failed', error);
 
 ## Network Logger
 
+Enable logging for all app network traffic:
+
 ```ts
-setupNetworkLogger(apiClient, {
+setupNetworkLogger({
   sensitiveHeaders: ['authorization', 'x-api-key'],
   maxBodyLength: 10000,
+});
+```
+
+If you use a custom Axios instance and want instance-level interceptors as well:
+
+```ts
+import axios from 'axios';
+import { setupAxiosLogger } from 'react-native-qa-logger';
+
+const apiClient = axios.create({
+  baseURL: 'https://api.example.com',
+});
+
+setupAxiosLogger(apiClient, {
+  sensitiveHeaders: ['authorization'],
 });
 ```
 
@@ -164,7 +176,8 @@ For feature requests, integrations, paid support, or consulting — feel free to
 
 ## Roadmap
 
-* [ ] Fetch API logger
+* [x] Fetch API logger
+* [x] XMLHttpRequest logger
 * [ ] Export logs
 * [ ] Share logs
 * [ ] Log persistence
