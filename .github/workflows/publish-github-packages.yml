@@ -16,7 +16,7 @@ jobs:
           node-version: 20
           registry-url: 'https://npm.pkg.github.com'
           scope: '@shubhanshubb'
-      - run: npm install --legacy-peer-deps
+      - run: npm ci                           # lockfile install: reproducible @types tree
       - run: npm run build
       - run: npm pkg set name=@shubhanshubb/react-native-qa-logger
       - run: npm pkg set publishConfig.registry=https://npm.pkg.github.com

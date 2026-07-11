@@ -16,7 +16,7 @@ jobs:
           node-version: 20
           registry-url: 'https://registry.npmjs.org'
       - run: npm install -g npm@latest        # OIDC needs recent npm
-      - run: npm install --legacy-peer-deps
+      - run: npm ci                           # lockfile install: reproducible @types tree
       - run: npm run build
       - name: Publish
         run: |
