@@ -1,0 +1,32 @@
+name: Publish to GitHub Packages
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          registry-url: 'https://npm.pkg.github.com'
+          scope: '@shubhanshubb'
+      - run: npm install --legacy-peer-deps
+      - run: npm run build
+      - run: npm pkg set name=@shubhanshubb/react-native-qa-logger
+      - run: npm pkg set publishConfig.registry=https://npm.pkg.github.com
+      - name: Publish
+        run: |
+          VERSION="$(node -p "require('./package.json').version")"
+          if [[ "$VERSION" == *-* ]]; then
+            npm publish --tag alpha
+          else
+            npm publish
+          fi
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
