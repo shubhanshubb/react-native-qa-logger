@@ -2,7 +2,7 @@
 
 All notable changes to this project will be documented in this file.
 
-## [1.1.0] - Unreleased
+## [1.1.1] - 2026-07-11
 
 ### Added
 - Export logs as JSON for easier bug reporting and QA handoff
