@@ -1,6 +1,6 @@
 {
   "name": "react-native-qa-logger",
-  "version": "1.0.6",
+  "version": "1.1.0",
   "description": "In-app QA logging and debugging package for React Native with debug console, universal network logging, and error tracking",
   "main": "lib/index.js",
   "types": "lib/index.d.ts",
@@ -39,14 +39,18 @@
   },
   "funding": {
     "type": "individual",
-    "url": "https://shubhanshubb.dev"
+    "url": "https://buymeacoffee.com/shubhanshubb"
   },
   "maintainers": [
     {
       "name": "Shubhanshu Barnwal",
-      "email": "connect@shubhanshubb.dev"
+      "email": "connect@shubhanshubb.dev",
+      "url": "https://shubhanshubb.dev"
     }
   ],
+  "dependencies": {
+    "@react-native-clipboard/clipboard": "^1.16.0"
+  },
   "peerDependencies": {
     "axios": ">=1.0.0",
     "react": ">=18.0.0",

@@ -96,6 +96,28 @@ function normalizeHeaders(
 }
 
 /**
+ * Estimate the byte size of a request/response body.
+ * Returns undefined when the size can't be determined.
+ */
+function estimateBodySize(body: any): number | undefined {
+  if (body === undefined || body === null) return undefined;
+
+  try {
+    const str = typeof body === 'string' ? body : JSON.stringify(body);
+    if (str === undefined) return undefined;
+
+    // Prefer Blob byte length when available (multi-byte safe)
+    if (typeof Blob !== 'undefined') {
+      return new Blob([str]).size;
+    }
+
+    return str.length;
+  } catch {
+    return undefined;
+  }
+}
+
+/**
  * Truncate body if too large
  */
 function truncateBody(body: any, maxLength: number = 10000): any {
@@ -166,6 +188,8 @@ export function setupAxiosLogger(
         requestTimings.delete(requestId);
       }
 
+      const responseHeaders = response.headers as Record<string, any> | undefined;
+
       // Log the network request
       logger.network({
         message: `${requestConfig.method?.toUpperCase()} ${response.status} ${requestConfig.url}`,
@@ -175,8 +199,11 @@ export function setupAxiosLogger(
         duration,
         requestHeaders: filterSensitiveHeaders(requestConfig.headers as any, sensitiveHeaders),
         requestBody: truncateBody(requestConfig.data, config.maxBodyLength),
-        responseHeaders: filterSensitiveHeaders(response.headers as any, sensitiveHeaders),
+        responseHeaders: filterSensitiveHeaders(responseHeaders as any, sensitiveHeaders),
         responseBody: truncateBody(response.data, config.maxBodyLength),
+        contentType: responseHeaders?.['content-type'] || responseHeaders?.['Content-Type'],
+        requestSize: estimateBodySize(requestConfig.data),
+        responseSize: estimateBodySize(response.data),
       });
 
       return response;
@@ -211,6 +238,11 @@ export function setupAxiosLogger(
           responseBody: error.response
             ? truncateBody(error.response.data, config.maxBodyLength)
             : undefined,
+          contentType: (error.response?.headers as Record<string, any> | undefined)?.[
+            'content-type'
+          ],
+          requestSize: estimateBodySize(requestConfig.data),
+          responseSize: error.response ? estimateBodySize(error.response.data) : undefined,
           error: error.message,
         });
       }
@@ -333,6 +365,8 @@ export function setupFetchLogger(config: NetworkLoggerConfig = {}): void {
         responseHeaders[key] = value;
       });
 
+      const contentLength = response.headers.get('content-length');
+
       // Log the network request
       logger.network({
         message: `${method.toUpperCase()} ${response.status} ${url}`,
@@ -344,6 +378,9 @@ export function setupFetchLogger(config: NetworkLoggerConfig = {}): void {
         requestBody: truncateBody(requestBody, config.maxBodyLength),
         responseHeaders: filterSensitiveHeaders(responseHeaders, sensitiveHeaders),
         responseBody: truncateBody(responseBody, config.maxBodyLength),
+        contentType: response.headers.get('content-type') || undefined,
+        requestSize: estimateBodySize(requestInitBody),
+        responseSize: contentLength ? Number(contentLength) : estimateBodySize(responseBody),
       });
 
       return response;
@@ -447,15 +484,30 @@ export function setupXHRLogger(config: NetworkLoggerConfig = {}): void {
         const duration = Date.now() - qaLogger.startTime;
 
         let responseBody: any = null;
+        // `responseText` is only readable when responseType is '' or 'text';
+        // accessing it for 'blob'/'arraybuffer' throws, so branch on the type.
+        const responseType = this.responseType;
         try {
-          const contentType = this.getResponseHeader('content-type') || '';
-          if (contentType.includes('application/json')) {
-            responseBody = JSON.parse(this.responseText);
+          if (responseType === '' || responseType === 'text') {
+            const text = this.responseText;
+            const contentType = this.getResponseHeader('content-type') || '';
+            if (contentType.includes('application/json') && text) {
+              try {
+                responseBody = JSON.parse(text);
+              } catch {
+                responseBody = text;
+              }
+            } else {
+              responseBody = text;
+            }
+          } else if (responseType === 'json') {
+            responseBody = this.response;
           } else {
-            responseBody = this.responseText;
+            // blob / arraybuffer / document — not text-serializable
+            responseBody = `[${responseType} response]`;
           }
         } catch {
-          responseBody = this.responseText;
+          responseBody = '[Unable to read response body]';
         }
 
         // Parse response headers
@@ -468,6 +520,9 @@ export function setupXHRLogger(config: NetworkLoggerConfig = {}): void {
           }
         });
 
+        const contentType = this.getResponseHeader('content-type') || undefined;
+        const contentLength = this.getResponseHeader('content-length');
+
         logger.network({
           message: `${qaLogger.method.toUpperCase()} ${this.status} ${qaLogger.url}`,
           url: qaLogger.url,
@@ -478,6 +533,9 @@ export function setupXHRLogger(config: NetworkLoggerConfig = {}): void {
           requestBody: truncateBody(qaLogger.requestBody, config.maxBodyLength),
           responseHeaders: filterSensitiveHeaders(responseHeaders, sensitiveHeaders),
           responseBody: truncateBody(responseBody, config.maxBodyLength),
+          contentType,
+          requestSize: estimateBodySize(qaLogger.requestBody),
+          responseSize: contentLength ? Number(contentLength) : estimateBodySize(responseBody),
         });
       });
 
@@ -554,6 +612,9 @@ interface ManualNetworkLogParams {
   requestBody?: any;
   responseHeaders?: Record<string, string>;
   responseBody?: any;
+  contentType?: string;
+  requestSize?: number;
+  responseSize?: number;
   error?: string;
 }
 
@@ -569,6 +630,8 @@ export function logNetworkRequest(params: ManualNetworkLogParams): void {
   logger.network({
     message: `${params.method.toUpperCase()} ${params.statusCode || 'PENDING'} ${params.url}`,
     ...params,
+    requestSize: params.requestSize ?? estimateBodySize(params.requestBody),
+    responseSize: params.responseSize ?? estimateBodySize(params.responseBody),
   });
 }
 

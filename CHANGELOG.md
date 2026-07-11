@@ -2,6 +2,26 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.1.0] - Unreleased
+
+### Added
+- Export logs as JSON for easier bug reporting and QA handoff
+- Share/copy actions for individual logs and the full console output
+- Copy any network request as a ready-to-run `curl` command
+- Optional log persistence so sessions can survive app restarts during debugging
+
+### Changed
+- Expanded network logging details with request duration and response metadata
+- Improved console usability for larger log volumes and long-running QA sessions
+
+### Planned
+- Redesigned debug console UI
+- More "copy as" formats for network requests (`fetch()` snippet, HAR entry)
+- "Copy as cURL" for the full session (batch export all network calls)
+- Opt-in raw (unredacted) cURL/headers for local debugging
+- Screenshot capture from inside the debug console
+- Lightweight performance metrics for key screens or requests
+
 ## [1.0.6] - 2026-03-28
 
 ### Changed

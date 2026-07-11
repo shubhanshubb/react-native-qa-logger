@@ -13,6 +13,9 @@ import {
 } from 'react-native';
 import { logger } from './logger';
 import { LogEntry, LogFilter, LogLevel, isNetworkLog } from './types';
+import { copyToClipboard, shareText } from './share';
+import { buildCurlCommand } from './curl';
+import { safeStringify } from './serialize';
 
 interface DebugConsoleProps {
   visible: boolean;
@@ -55,13 +58,11 @@ const COLORS = {
 };
 
 export const DebugConsole: React.FC<DebugConsoleProps> = ({ visible, onClose, enabled }) => {
-  // Check if should be enabled (either in DEV mode or explicitly enabled)
+  // Check if should be enabled (either in DEV mode or explicitly enabled).
+  // NOTE: hooks must run unconditionally (Rules of Hooks), so this only gates
+  // rendering below — never early-return before the hooks.
   const isEnabled = enabled ?? __DEV__;
 
-  // Return null early if not enabled
-  if (!isEnabled) {
-    return null;
-  }
   const [activeFilter, setActiveFilter] = useState<LogFilter>('all');
   const [logs, setLogs] = useState<LogEntry[]>([]);
   const [expandedLogIds, setExpandedLogIds] = useState<Set<string>>(new Set());
@@ -93,7 +94,7 @@ export const DebugConsole: React.FC<DebugConsoleProps> = ({ visible, onClose, en
         const query = searchQuery.toLowerCase();
         const searchFiltered = filteredLogs.filter(log => {
           const message = log.message.toLowerCase();
-          const data = JSON.stringify(log.data || {}).toLowerCase();
+          const data = safeStringify(log.data || {}).toLowerCase();
           return message.includes(query) || data.includes(query);
         });
         setLogs(searchFiltered.reverse());
@@ -122,6 +123,54 @@ export const DebugConsole: React.FC<DebugConsoleProps> = ({ visible, onClose, en
   const handleClearLogs = useCallback(() => {
     logger.clearLogs();
     setExpandedLogIds(new Set());
+  }, []);
+
+  const [copiedLogId, setCopiedLogId] = useState<string | null>(null);
+
+  const formatLogForShare = useCallback((log: LogEntry): string => {
+    return safeStringify(log, 2);
+  }, []);
+
+  const handleCopyLog = useCallback(
+    (log: LogEntry) => {
+      const copied = copyToClipboard(formatLogForShare(log));
+      if (copied) {
+        setCopiedLogId(log.id);
+        setTimeout(() => {
+          setCopiedLogId(current => (current === log.id ? null : current));
+        }, 1500);
+      } else {
+        // No clipboard available - fall back to the share sheet
+        void shareText(formatLogForShare(log), 'QA Log');
+      }
+    },
+    [formatLogForShare]
+  );
+
+  const handleShareLog = useCallback(
+    (log: LogEntry) => {
+      void shareText(formatLogForShare(log), 'QA Log');
+    },
+    [formatLogForShare]
+  );
+
+  const handleExportAll = useCallback(() => {
+    const json = logger.exportLogs(activeFilter);
+    void shareText(json, `QA Logs (${activeFilter})`);
+  }, [activeFilter]);
+
+  const handleCopyCurl = useCallback((log: LogEntry) => {
+    if (!isNetworkLog(log)) return;
+    const curl = buildCurlCommand(log);
+    const copied = copyToClipboard(curl);
+    if (copied) {
+      setCopiedLogId(`${log.id}:curl`);
+      setTimeout(() => {
+        setCopiedLogId(current => (current === `${log.id}:curl` ? null : current));
+      }, 1500);
+    } else {
+      void shareText(curl, 'cURL command');
+    }
   }, []);
 
   const getLogColor = (level: LogLevel): string => {
@@ -161,6 +210,13 @@ export const DebugConsole: React.FC<DebugConsoleProps> = ({ visible, onClose, en
     const seconds = date.getSeconds().toString().padStart(2, '0');
     const ms = date.getMilliseconds().toString().padStart(3, '0');
     return `${hours}:${minutes}:${seconds}.${ms}`;
+  };
+
+  const formatBytes = (bytes?: number): string | null => {
+    if (bytes === undefined || bytes === null || Number.isNaN(bytes)) return null;
+    if (bytes < 1024) return `${bytes} B`;
+    if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+    return `${(bytes / (1024 * 1024)).toFixed(2)} MB`;
   };
 
   const getStatusColor = (statusCode?: number): string => {
@@ -223,22 +279,40 @@ export const DebugConsole: React.FC<DebugConsoleProps> = ({ visible, onClose, en
                       </Text>
                     </View>
                   )}
-                  {item.duration && (
+                  {item.duration !== undefined && (
                     <Text style={styles.duration}>{item.duration}ms</Text>
                   )}
                 </View>
                 <DetailRow label="URL" value={item.url} />
+                {(item.contentType ||
+                  formatBytes(item.responseSize) ||
+                  formatBytes(item.requestSize)) && (
+                  <View style={styles.metaRow}>
+                    {item.contentType && (
+                      <MetaChip label="Type" value={item.contentType} />
+                    )}
+                    {formatBytes(item.requestSize) && (
+                      <MetaChip label="Req" value={formatBytes(item.requestSize)!} />
+                    )}
+                    {formatBytes(item.responseSize) && (
+                      <MetaChip label="Res" value={formatBytes(item.responseSize)!} />
+                    )}
+                    {item.duration !== undefined && (
+                      <MetaChip label="Time" value={`${item.duration}ms`} />
+                    )}
+                  </View>
+                )}
                 {item.requestBody && (
                   <DetailRow
                     label="Request"
-                    value={JSON.stringify(item.requestBody, null, 2)}
+                    value={safeStringify(item.requestBody, 2)}
                     monospace
                   />
                 )}
                 {item.responseBody && (
                   <DetailRow
                     label="Response"
-                    value={JSON.stringify(item.responseBody, null, 2)}
+                    value={safeStringify(item.responseBody, 2)}
                     monospace
                   />
                 )}
@@ -249,7 +323,7 @@ export const DebugConsole: React.FC<DebugConsoleProps> = ({ visible, onClose, en
             {item.data && !isNetworkLog(item) && (
               <DetailRow
                 label="Data"
-                value={JSON.stringify(item.data, null, 2)}
+                value={safeStringify(item.data, 2)}
                 monospace
               />
             )}
@@ -257,13 +331,62 @@ export const DebugConsole: React.FC<DebugConsoleProps> = ({ visible, onClose, en
             {item.stackTrace && (
               <DetailRow label="Stack Trace" value={item.stackTrace} monospace isError />
             )}
+
+            <View style={styles.logActions}>
+              <TouchableOpacity
+                style={styles.logActionButton}
+                onPress={() => handleCopyLog(item)}
+              >
+                {copiedLogId === item.id ? (
+                  <CheckIcon size={14} color={COLORS.success} />
+                ) : (
+                  <CopyIcon size={14} color={COLORS.textSecondary} />
+                )}
+                <Text
+                  style={[
+                    styles.logActionText,
+                    copiedLogId === item.id && { color: COLORS.success },
+                  ]}
+                >
+                  {copiedLogId === item.id ? 'Copied' : 'Copy'}
+                </Text>
+              </TouchableOpacity>
+              {isNetworkLog(item) && (
+                <TouchableOpacity
+                  style={styles.logActionButton}
+                  onPress={() => handleCopyCurl(item)}
+                >
+                  {copiedLogId === `${item.id}:curl` ? (
+                    <CheckIcon size={14} color={COLORS.success} />
+                  ) : (
+                    <CurlIcon size={14} color={COLORS.textSecondary} />
+                  )}
+                  <Text
+                    style={[
+                      styles.logActionText,
+                      copiedLogId === `${item.id}:curl` && { color: COLORS.success },
+                    ]}
+                  >
+                    {copiedLogId === `${item.id}:curl` ? 'Copied' : 'cURL'}
+                  </Text>
+                </TouchableOpacity>
+              )}
+              <TouchableOpacity
+                style={styles.logActionButton}
+                onPress={() => handleShareLog(item)}
+              >
+                <ShareIcon size={14} color={COLORS.textSecondary} />
+                <Text style={styles.logActionText}>Share</Text>
+              </TouchableOpacity>
+            </View>
           </View>
         )}
       </TouchableOpacity>
     );
   };
 
-  if (!visible) {
+  // Gate rendering here (after all hooks have run) rather than early-returning.
+  if (!isEnabled || !visible) {
     return null;
   }
 
@@ -302,6 +425,13 @@ export const DebugConsole: React.FC<DebugConsoleProps> = ({ visible, onClose, en
               <Text style={styles.subtitle}>{logs.length} logs</Text>
             </View>
             <View style={styles.headerActions}>
+              <TouchableOpacity
+                style={styles.exportButton}
+                onPress={handleExportAll}
+                disabled={logs.length === 0}
+              >
+                <Text style={styles.exportButtonText}>📤 Export</Text>
+              </TouchableOpacity>
               <TouchableOpacity
                 style={styles.clearButton}
                 onPress={handleClearLogs}
@@ -366,6 +496,11 @@ export const DebugConsole: React.FC<DebugConsoleProps> = ({ visible, onClose, en
             style={styles.logsList}
             contentContainerStyle={styles.logsContent}
             showsVerticalScrollIndicator={false}
+            initialNumToRender={15}
+            maxToRenderPerBatch={15}
+            windowSize={11}
+            removeClippedSubviews
+            keyboardShouldPersistTaps="handled"
             ListEmptyComponent={
               <View style={styles.emptyState}>
                 <Text style={styles.emptyStateIcon}>📭</Text>
@@ -414,6 +549,158 @@ const Tab: React.FC<TabProps> = ({ label, icon, count, active, onPress, color })
       </Text>
     </View>
   </TouchableOpacity>
+);
+
+interface IconProps {
+  size?: number;
+  color?: string;
+}
+
+/** Copy icon — two overlapping sheets, drawn with Views (no native deps) */
+const CopyIcon: React.FC<IconProps> = ({ size = 14, color = COLORS.textSecondary }) => {
+  const sheet = size * 0.72;
+  return (
+    <View style={{ width: size + 3, height: size + 3 }}>
+      <View
+        style={{
+          position: 'absolute',
+          top: 0,
+          right: 0,
+          width: sheet,
+          height: sheet,
+          borderWidth: 1.5,
+          borderColor: color,
+          borderRadius: 3,
+        }}
+      />
+      <View
+        style={{
+          position: 'absolute',
+          bottom: 0,
+          left: 0,
+          width: sheet,
+          height: sheet,
+          borderWidth: 1.5,
+          borderColor: color,
+          borderRadius: 3,
+          backgroundColor: COLORS.bgTertiary,
+        }}
+      />
+    </View>
+  );
+};
+
+/** Share/upload icon — tray with an up arrow, drawn with Views */
+const ShareIcon: React.FC<IconProps> = ({ size = 14, color = COLORS.textSecondary }) => (
+  <View style={{ width: size, height: size, alignItems: 'center', justifyContent: 'flex-end' }}>
+    <View
+      style={{
+        width: size,
+        height: size * 0.5,
+        borderWidth: 1.6,
+        borderColor: color,
+        borderTopWidth: 0,
+        borderBottomLeftRadius: 2,
+        borderBottomRightRadius: 2,
+      }}
+    />
+    <View
+      style={{
+        position: 'absolute',
+        top: size * 0.3,
+        width: 1.6,
+        height: size * 0.42,
+        backgroundColor: color,
+      }}
+    />
+    <View
+      style={{
+        position: 'absolute',
+        top: size * 0.12,
+        width: 0,
+        height: 0,
+        borderLeftWidth: size * 0.22,
+        borderRightWidth: size * 0.22,
+        borderBottomWidth: size * 0.28,
+        borderLeftColor: 'transparent',
+        borderRightColor: 'transparent',
+        borderBottomColor: color,
+      }}
+    />
+  </View>
+);
+
+/** Checkmark icon — two rotated bars */
+const CheckIcon: React.FC<IconProps> = ({ size = 14, color = COLORS.success }) => (
+  <View style={{ width: size, height: size }}>
+    <View
+      style={{
+        position: 'absolute',
+        left: size * 0.18,
+        top: size * 0.42,
+        width: 1.8,
+        height: size * 0.4,
+        backgroundColor: color,
+        transform: [{ rotate: '-45deg' }],
+      }}
+    />
+    <View
+      style={{
+        position: 'absolute',
+        left: size * 0.44,
+        top: size * 0.2,
+        width: 1.8,
+        height: size * 0.7,
+        backgroundColor: color,
+        transform: [{ rotate: '45deg' }],
+      }}
+    />
+  </View>
+);
+
+/** Terminal / cURL icon — a window with a prompt chevron */
+const CurlIcon: React.FC<IconProps> = ({ size = 14, color = COLORS.textSecondary }) => (
+  <View style={{ width: size + 2, height: size, borderWidth: 1.5, borderColor: color, borderRadius: 3 }}>
+    <View
+      style={{
+        position: 'absolute',
+        top: size * 0.28,
+        left: size * 0.22,
+        width: 0,
+        height: 0,
+        borderTopWidth: size * 0.16,
+        borderBottomWidth: size * 0.16,
+        borderLeftWidth: size * 0.2,
+        borderTopColor: 'transparent',
+        borderBottomColor: 'transparent',
+        borderLeftColor: color,
+      }}
+    />
+    <View
+      style={{
+        position: 'absolute',
+        bottom: size * 0.26,
+        left: size * 0.5,
+        width: size * 0.28,
+        height: 1.6,
+        backgroundColor: color,
+      }}
+    />
+  </View>
+);
+
+interface MetaChipProps {
+  label: string;
+  value: string;
+}
+
+const MetaChip: React.FC<MetaChipProps> = ({ label, value }) => (
+  <View style={styles.metaChip}>
+    <Text style={styles.metaChipLabel}>{label}</Text>
+    <Text style={styles.metaChipValue} numberOfLines={1}>
+      {value}
+    </Text>
+  </View>
 );
 
 interface DetailRowProps {
@@ -503,6 +790,19 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 12,
+  },
+  exportButton: {
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    backgroundColor: COLORS.primary + '15',
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: COLORS.primary + '30',
+  },
+  exportButtonText: {
+    color: COLORS.primary,
+    fontWeight: '600',
+    fontSize: 14,
   },
   clearButton: {
     paddingHorizontal: 14,
@@ -705,6 +1005,59 @@ const styles = StyleSheet.create({
     color: COLORS.textMuted,
     fontSize: 12,
     fontFamily: 'monospace',
+  },
+  metaRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+    marginBottom: 12,
+  },
+  metaChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    backgroundColor: COLORS.bgPrimary,
+    borderRadius: 8,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+    maxWidth: '100%',
+  },
+  metaChipLabel: {
+    color: COLORS.textMuted,
+    fontSize: 10,
+    fontWeight: '700',
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+  },
+  metaChipValue: {
+    color: COLORS.textSecondary,
+    fontSize: 12,
+    fontFamily: 'monospace',
+    flexShrink: 1,
+  },
+  logActions: {
+    flexDirection: 'row',
+    gap: 10,
+    marginTop: 4,
+  },
+  logActionButton: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    paddingVertical: 9,
+    backgroundColor: COLORS.bgTertiary,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+  },
+  logActionText: {
+    color: COLORS.textSecondary,
+    fontSize: 13,
+    fontWeight: '600',
   },
   detailRow: {
     marginBottom: 12,

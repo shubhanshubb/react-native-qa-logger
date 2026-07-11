@@ -14,4 +14,6 @@ export {
 export { setupErrorHandlers, restoreErrorHandlers } from './errors';
 export { DebugButton } from './DebugButton';
 export { DebugConsole } from './DebugConsole';
+export { copyToClipboard, shareText, copyOrShare, setClipboard } from './share';
+export { buildCurlCommand } from './curl';
 export * from './types';

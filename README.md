@@ -6,10 +6,16 @@
 
 A powerful in-app logging and debugging package for React Native, designed specifically for QA and development builds. Inspired by Loggycian for Flutter, this package provides a comprehensive logging solution with a beautiful UI for viewing logs, network requests, and errors directly inside your app.
 
-## Screenshot
+## Screenshots
 
 <p align="center">
   <img src="assets/debug-console.png" alt="Debug Console" width="300" />
+  &nbsp;&nbsp;
+  <img src="assets/debug-console-network.png" alt="Network log with export, copy, cURL and share actions" width="300" />
+</p>
+
+<p align="center">
+  <em>Debug console &nbsp;·&nbsp; Network log with metadata, export, copy, cURL and share</em>
 </p>
 
 ---
@@ -33,6 +39,10 @@ One button. One console. All logs. All network calls. All errors.
 * Color Coded Logs
 * Expandable Log Items
 * Search & Filter (All, Network, Errors)
+* Export logs as JSON for bug reports & QA handoff
+* Copy / Share individual logs or the full console output
+* Optional log persistence across app restarts
+* Rich network metadata (duration, content-type, request/response size)
 * Zero Production Impact (Disabled in Prod)
 * Full TypeScript Support
 * 100% JS – No Native Code
@@ -155,10 +165,73 @@ Bottom sheet debug console.
 
 ---
 
+## Export & Share
+
+Export the current logs as a pretty-printed JSON string — great for attaching to a bug report or handing off to QA:
+
+```ts
+const json = logger.exportLogs();        // all logs
+const errorsJson = logger.exportLogs('errors'); // only errors
+```
+
+Inside the console, tap **Export** in the header to share the visible logs via the native share sheet, or expand any log and use **Copy** / **Share** for a single entry. Expanded **network** logs also offer a **cURL** action that copies a ready-to-run `curl` command:
+
+```ts
+import { buildCurlCommand } from 'react-native-qa-logger';
+
+// from any NetworkLogEntry
+const cmd = buildCurlCommand(networkLog);
+```
+
+> Sensitive headers are redacted in the generated `curl` (shown as `[REDACTED]`), so you can safely paste it into a bug report — fill in real credentials before running.
+
+You can also copy/share programmatically:
+
+```ts
+import { copyToClipboard, shareText } from 'react-native-qa-logger';
+
+copyToClipboard(logger.exportLogs());
+shareText(logger.exportLogs(), 'QA Logs');
+```
+
+> `copyToClipboard` uses the built-in `Clipboard` when your RN version still ships it, and otherwise falls back to the native Share sheet — no hard dependency is added. On RN 0.72+ you can enable clipboard copy by registering your installed clipboard once:
+>
+> ```ts
+> import Clipboard from '@react-native-clipboard/clipboard';
+> import { setClipboard } from 'react-native-qa-logger';
+>
+> setClipboard(Clipboard);
+> ```
+
+---
+
+## Log Persistence
+
+Persist logs across app restarts so long-running QA sessions and crash repros aren't lost. Provide any async storage adapter (e.g. AsyncStorage):
+
+```ts
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { logger } from 'react-native-qa-logger';
+
+logger.configure({
+  persist: true,
+  storage: AsyncStorage, // any { getItem, setItem, removeItem }
+  persistKey: '@qa-logger/logs', // optional
+});
+```
+
+Persisted logs are hydrated automatically on startup and cleared when you clear the console.
+
+---
+
 ## Configuration
 
 ```ts
-logger.configure({ maxLogs: 500 });
+logger.configure({
+  maxLogs: 500,
+  persist: true,
+  storage: AsyncStorage,
+});
 ```
 
 ---
@@ -178,9 +251,14 @@ For feature requests, integrations, paid support, or consulting — feel free to
 
 * [x] Fetch API logger
 * [x] XMLHttpRequest logger
-* [ ] Export logs
-* [ ] Share logs
-* [ ] Log persistence
+* [x] Export logs
+* [x] Share logs
+* [x] Copy request as cURL
+* [x] Log persistence
+* [ ] Redesigned debug console UI
+* [ ] Copy as `fetch()` snippet / HAR export
+* [ ] Batch "copy as cURL" for a whole session
+* [ ] Opt-in raw (unredacted) cURL for local debugging
 * [ ] Performance metrics
 * [ ] Screenshot capture
 
