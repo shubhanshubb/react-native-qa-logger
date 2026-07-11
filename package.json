@@ -11,7 +11,10 @@
     "build": "tsc",
     "upload": "npm publish",
     "prepare": "npm run build",
-    "prepublishOnly": "npm run build"
+    "prepublishOnly": "npm run build",
+    "publish:git": "git push origin HEAD --follow-tags",
+    "publish:npm": "npm publish --access public",
+    "release": "npm run build && npm publish --access public && git push origin HEAD --follow-tags"
   },
   "keywords": [
     "react-native",
