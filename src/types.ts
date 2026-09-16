@@ -89,6 +89,60 @@ export interface ExportedLogs {
 }
 
 /**
+ * Quick aggregate stats for the current logger state.
+ */
+export interface LogSummary {
+  total: number;
+  info: number;
+  warn: number;
+  error: number;
+  network: number;
+  newestTimestamp?: number;
+  oldestTimestamp?: number;
+}
+
+/**
+ * Options for sending logs to a backend endpoint.
+ */
+export interface SendLogsOptions {
+  url: string;
+  method?: 'POST' | 'PUT' | 'PATCH';
+  filter?: LogFilter;
+  headers?: Record<string, string>;
+  bodyKey?: string;
+  timeoutMs?: number;
+  authToken?: string;
+}
+
+/**
+ * Result payload returned from a log upload request.
+ */
+export interface SendLogsResult {
+  ok: boolean;
+  status: number;
+  url: string;
+  filter: LogFilter;
+  response?: any;
+  responseText?: string;
+  error?: any;
+}
+
+/**
+ * Human-friendly QA report format.
+ */
+export type QAReportFormat = 'text' | 'markdown' | 'json';
+
+/**
+ * Options for generating a QA report payload.
+ */
+export interface QAReportOptions {
+  filter?: LogFilter;
+  format?: QAReportFormat;
+  title?: string;
+  includeSummary?: boolean;
+}
+
+/**
  * Type guard to check if a log entry is a network log
  */
 export function isNetworkLog(log: LogEntry): log is NetworkLogEntry {
