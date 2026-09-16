@@ -6,8 +6,13 @@ import {
   LogFilter,
   StorageAdapter,
   ExportedLogs,
+  LogSummary,
+  SendLogsOptions,
+  SendLogsResult,
+  QAReportOptions,
 } from './types';
 import { safeStringify } from './serialize';
+import { shareText } from './share';
 
 const DEFAULT_PERSIST_KEY = '@qa-logger/logs';
 const PERSIST_DEBOUNCE_MS = 500;
@@ -301,6 +306,215 @@ class QALogger {
    */
   getLogCount(): number {
     return this.logs.length;
+  }
+
+  /**
+   * Returns a quick summary of the current logs, optionally focused on a filter.
+   */
+  getSummary(filter: LogFilter = 'all'): LogSummary {
+    const logs = filter === 'all' ? this.logs : this.getFilteredLogs(filter);
+
+    const summary: LogSummary = {
+      total: logs.length,
+      info: 0,
+      warn: 0,
+      error: 0,
+      network: 0,
+    };
+
+    if (logs.length === 0) {
+      return summary;
+    }
+
+    for (const log of logs) {
+      if (log.level === LogLevel.INFO) summary.info += 1;
+      if (log.level === LogLevel.WARN) summary.warn += 1;
+      if (log.level === LogLevel.ERROR) summary.error += 1;
+      if (log.level === LogLevel.NETWORK) summary.network += 1;
+    }
+
+    const timestamps = logs
+      .map(log => log.timestamp)
+      .filter(timestamp => typeof timestamp === 'number');
+
+    summary.oldestTimestamp = timestamps.length ? Math.min(...timestamps) : undefined;
+    summary.newestTimestamp = timestamps.length ? Math.max(...timestamps) : undefined;
+
+    return summary;
+  }
+
+  /**
+   * Send the current logs to a QA or telemetry API endpoint.
+   */
+  async sendLogs(options: SendLogsOptions): Promise<SendLogsResult> {
+    const {
+      url,
+      method = 'POST',
+      filter = 'all',
+      headers = {},
+      bodyKey = 'logs',
+      timeoutMs = 15000,
+      authToken,
+    } = options;
+
+    const payload = {
+      [bodyKey]: this.getExport(filter),
+      sentAt: Date.now(),
+      filter,
+    };
+
+    const requestHeaders: Record<string, string> = {
+      Accept: 'application/json',
+      'Content-Type': 'application/json',
+      ...headers,
+    };
+
+    if (authToken) {
+      requestHeaders.Authorization = `Bearer ${authToken}`;
+    }
+
+    const controller = typeof AbortController !== 'undefined' ? new AbortController() : null;
+    const timeoutId = timeoutMs
+      ? setTimeout(() => {
+          controller?.abort();
+        }, timeoutMs)
+      : null;
+
+    try {
+      const response = await fetch(url, {
+        method,
+        headers: requestHeaders,
+        body: safeStringify(payload),
+        signal: controller?.signal,
+      });
+
+      const responseText = await response.text();
+      let parsedResponse: any = undefined;
+
+      try {
+        parsedResponse = responseText ? JSON.parse(responseText) : undefined;
+      } catch {
+        parsedResponse = responseText;
+      }
+
+      return {
+        ok: response.ok,
+        status: response.status,
+        url,
+        filter,
+        response: parsedResponse,
+        responseText,
+      };
+    } catch (error) {
+      return {
+        ok: false,
+        status: 0,
+        url,
+        filter,
+        error,
+      };
+    } finally {
+      if (timeoutId) {
+        clearTimeout(timeoutId);
+      }
+    }
+  }
+
+  /**
+   * Build a developer-friendly QA report for sharing, email, or backend triage.
+   */
+  buildReport(options: QAReportOptions = {}): string {
+    const {
+      filter = 'all',
+      format = 'text',
+      title = 'QA Report',
+      includeSummary = true,
+    } = options;
+
+    const logs = this.getFilteredLogs(filter);
+    const summary = this.getSummary(filter);
+
+    if (format === 'json') {
+      return safeStringify(
+        {
+          title,
+          generatedAt: Date.now(),
+          filter,
+          summary,
+          logs,
+        },
+        2
+      );
+    }
+
+    const lines: string[] = [];
+
+    if (format === 'markdown') {
+      lines.push(`# ${title}`);
+      lines.push('');
+      lines.push(`- Generated at: ${new Date().toISOString()}`);
+      lines.push(`- Filter: ${filter}`);
+    } else {
+      lines.push(title);
+      lines.push('='.repeat(Math.max(title.length, 24)));
+      lines.push(`Generated at: ${new Date().toISOString()}`);
+      lines.push(`Filter: ${filter}`);
+    }
+
+    if (includeSummary) {
+      if (format === 'markdown') {
+        lines.push('');
+        lines.push('## Summary');
+        lines.push(`- Total: ${summary.total}`);
+        lines.push(`- Info: ${summary.info}`);
+        lines.push(`- Warn: ${summary.warn}`);
+        lines.push(`- Error: ${summary.error}`);
+        lines.push(`- Network: ${summary.network}`);
+      } else {
+        lines.push('');
+        lines.push('Summary:');
+        lines.push(`  Total: ${summary.total}`);
+        lines.push(`  Info: ${summary.info}`);
+        lines.push(`  Warn: ${summary.warn}`);
+        lines.push(`  Error: ${summary.error}`);
+        lines.push(`  Network: ${summary.network}`);
+      }
+    }
+
+    lines.push('');
+
+    if (logs.length === 0) {
+      lines.push(format === 'markdown' ? 'No logs found.' : 'No logs found for this filter.');
+      return lines.join('\n');
+    }
+
+    for (const log of logs) {
+      const timestamp = new Date(log.timestamp).toISOString();
+      if (format === 'markdown') {
+        lines.push(`## ${log.level.toUpperCase()} · ${timestamp}`);
+        lines.push(`**Message:** ${log.message}`);
+        if (log.stackTrace) lines.push(`**Stack:** \n${log.stackTrace}`);
+        if (log.data !== undefined) lines.push(`**Data:** ${safeStringify(log.data, 2)}`);
+        lines.push('');
+      } else {
+        lines.push(`[${timestamp}] ${log.level.toUpperCase()} ${log.message}`);
+        if (log.stackTrace) lines.push(`  Stack: ${log.stackTrace}`);
+        if (log.data !== undefined) lines.push(`  Data: ${safeStringify(log.data, 2)}`);
+        lines.push('');
+      }
+    }
+
+    return lines.join('\n');
+  }
+
+  /**
+   * Share the current QA report with a developer or teammate.
+   */
+  async shareReport(options: QAReportOptions = {}): Promise<string> {
+    const { title = 'QA Report', ...rest } = options;
+    const content = this.buildReport({ ...rest, title });
+    await shareText(content, title);
+    return content;
   }
 
   /**

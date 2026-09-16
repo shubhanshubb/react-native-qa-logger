@@ -174,6 +174,44 @@ const json = logger.exportLogs();        // all logs
 const errorsJson = logger.exportLogs('errors'); // only errors
 ```
 
+You can also inspect quick health stats without exporting everything:
+
+```ts
+const summary = logger.getSummary();
+// {
+//   total: 42,
+//   info: 16,
+//   warn: 5,
+//   error: 3,
+//   network: 18,
+//   oldestTimestamp: 1712345678901,
+//   newestTimestamp: 1712345682901,
+// }
+
+const networkOnly = logger.getSummary('network');
+```
+
+If you want to send logs to your backend for QA triage or crash reports, you can POST the exported payload directly:
+
+```ts
+const result = await logger.sendLogs({
+  url: 'https://api.example.com/qa-logs',
+  method: 'POST',
+  filter: 'all',
+  headers: {
+    'x-app-version': '1.2.3',
+  },
+  authToken: 'your-token',
+  timeoutMs: 15000,
+});
+
+if (!result.ok) {
+  console.warn('Log upload failed', result.error);
+}
+```
+
+The request body contains the exported log snapshot plus metadata like the timestamp and selected filter, so your backend can store or display QA sessions without needing a custom formatter.
+
 Inside the console, tap **Export** in the header to share the visible logs via the native share sheet, or expand any log and use **Copy** / **Share** for a single entry. Expanded **network** logs also offer a **cURL** action that copies a ready-to-run `curl` command:
 
 ```ts

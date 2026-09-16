@@ -2,6 +2,18 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.2.0] - 2026-09-16
+
+### Added
+- `logger.getSummary()` for quick QA session health checks
+- `logger.sendLogs()` for posting logs to a backend or QA endpoint
+- `logger.buildReport()` and `logger.shareReport()` for developer-ready bug reports
+- Support for text, markdown, and JSON QA report formats
+
+### Changed
+- Improved export/share workflow for QA handoff and engineering collaboration
+- Expanded logger API for session reporting and remote triage
+
 ## [1.1.1] - 2026-07-11
 
 ### Added
