@@ -19,6 +19,8 @@ jobs:
       - run: npm ci                           # lockfile install: reproducible @types tree
       - run: npm run build
       - name: Publish
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
         run: |
           VERSION="$(node -p "require('./package.json').version")"
           if [[ "$VERSION" == *-* ]]; then
